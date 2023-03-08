@@ -1,8 +1,27 @@
 #include <Arduino.h>
-
-#include <Servo.h> // use the servo library
+// #include <Servo.h> // use the servo library
 #include "DFRobotMotorShield.h"
 DFRobotMotorShield motors;
+
+#define TIMER_INTERRUPT_DEBUG 0
+
+#define USE_TIMER_1 false
+#define USE_TIMER_2 true
+#define USE_TIMER_3 false
+#define USE_TIMER_4 false
+#define USE_TIMER_5 false
+
+#include "TimerInterrupt.h" //https://github.com/khoih-prog/TimerInterrupt
+#include "ISR_Timer.h"      //https://github.com/khoih-prog/TimerInterrupt
+
+ISR_Timer ISR_Timer2;
+
+#define TIMER2_INTERVAL_MS 1L
+
+volatile uint32_t startMillis = 0;
+
+volatile uint32_t deltaMillis2s = 0;
+volatile uint32_t deltaMillis5s = 0;
 
 /*
 2.S007 Mini Me Physical Homework Three
@@ -14,7 +33,7 @@ Based on 16.632 Line Following Code
 
 // distance sensor servo
 #define DISTANCE_SERVO_PIN 46 // distance sensor servo pin
-Servo myservo;
+// Servo myservo;
 int servoPosition = 90;
 
 // line tracker variables and constants
@@ -23,22 +42,22 @@ int servoPosition = 90;
 #define IR3_PIN A13
 #define IR4_PIN A14
 #define IR5_PIN A15
-int IR1Val, IR2Val, IR3Val, IR4Val, IR5Val;
+volatile int IR1Val, IR2Val, IR3Val, IR4Val, IR5Val;
 int IR1Min, IR2Min, IR3Min, IR4Min, IR5Min;
 int IR1Max, IR2Max, IR3Max, IR4Max, IR5Max;
 bool IR1Bool, IR2Bool, IR3Bool, IR4Bool, IR5Bool;
-float IR1Norm, IR2Norm, IR3Norm, IR4Norm, IR5Norm;
-float numerator, denominator;
-float SETPOINT = 3.0;   // sensor set point
-float weightedLocation; // sensor actual location
+volatile float IR1Norm, IR2Norm, IR3Norm, IR4Norm, IR5Norm;
+volatile float numerator, denominator;
+float SETPOINT = 3.0;            // sensor set point
+volatile float weightedLocation; // sensor actual location
 
 #define NORMED_VALUES_BUFFER_SIZE 10
 float normedValues[5][NORMED_VALUES_BUFFER_SIZE];
 int currentIndex = 0;
 
 // wheel speeds
-int leftSpeed, rightSpeed;
-float leftDeltaSpeed, rightDeltaSpeed;
+volatile int leftSpeed, rightSpeed;
+volatile float leftDeltaSpeed, rightDeltaSpeed;
 const int NORMAL_SPEED = 255;
 const int maxMotorSpeed = 255;
 
@@ -52,12 +71,12 @@ const float KD_Right = 11.0;
 const float DELTA_TIME = 12; // milliseconds
 
 // PID variables
-float error = 0.0;
-float previousError = 0.0;
-float leftIntegral = 0.0;
-float leftDerivative = 0.0;
-float rightIntegral = 0.0;
-float rightDerivative = 0.0;
+volatile float error = 0.0;
+volatile float previousError = 0.0;
+volatile float leftIntegral = 0.0;
+volatile float leftDerivative = 0.0;
+volatile float rightIntegral = 0.0;
+volatile float rightDerivative = 0.0;
 
 // define time variables/conversions
 long currentMillis = 0;
@@ -73,14 +92,19 @@ bool fullStop = false;
 
 float computeNormVal(float sensorVal, float minVal, float maxVal);
 bool isIntersection(float latestNormedValues[5]);
-void PIDLineTracker(float actualValue, float delta_time);
+void PIDLineTracker();
+
+void TimerHandler2()
+{
+  ISR_Timer2.run();
+}
 
 void setup()
 {
-  Serial.begin(9600);
+  Serial.begin(115200);
 
-  myservo.attach(DISTANCE_SERVO_PIN); // attach the servo to the servo pin
-  myservo.write(servoPosition);
+  // myservo.attach(DISTANCE_SERVO_PIN); // attach the servo to the servo pin
+  // myservo.write(servoPosition);
 
   pinMode(IR1_PIN, INPUT_PULLUP);
   pinMode(IR2_PIN, INPUT);
@@ -111,37 +135,21 @@ void setup()
       normedValues[i][j] = 1;
     }
   }
+
+  // Timer stuff
+  ITimer2.init();
+  if (ITimer2.attachInterruptInterval(TIMER2_INTERVAL_MS, TimerHandler2))
+    Serial.println("Starting  ITimer2 OK, millis() = " + String(millis()));
+  else
+    Serial.println("Can't set ITimer2. Select another freq., duration or timer");
+
+  ISR_Timer2.setInterval(1L, PIDLineTracker);
 }
 
 void loop()
 {
 
-  currentMillis = millis();
-
-  // read the line tracking sensor channels
-  IR1Val = analogRead(IR1_PIN);
-  IR2Val = analogRead(IR2_PIN);
-  IR3Val = analogRead(IR3_PIN);
-  IR4Val = analogRead(IR4_PIN);
-  IR5Val = analogRead(IR5_PIN);
-
-  // compute the normalized channel values
-  IR1Norm = computeNormVal(IR1Val, IR1Min, IR1Max);
-  IR2Norm = computeNormVal(IR2Val, IR2Min, IR2Max);
-  IR3Norm = computeNormVal(IR3Val, IR3Min, IR3Max);
-  IR4Norm = computeNormVal(IR4Val, IR4Min, IR4Max);
-  IR5Norm = computeNormVal(IR5Val, IR5Min, IR5Max);
-
-  // determine which channel lies over the line
-  // note: to prevent NAN, you can change to (1 - IR1Norm) to (1.001 - IR1Norm), etc.
-  numerator = ((1 - IR1Norm) * 1 + (1 - IR2Norm) * 2 + (1 - IR3Norm) * 3 + (1 - IR4Norm) * 4 + (1 - IR5Norm) * 5);
-  denominator = (1 - IR1Norm) + (1 - IR2Norm) + (1 - IR3Norm) + (1 - IR4Norm) + (1 - IR5Norm);
-  weightedLocation = numerator / denominator;
-
-  if (isnan(weightedLocation))
-  {
-    weightedLocation = 3.0;
-  }
+  // currentMillis = millis();
 
   float latestNormedValues[] = {IR1Norm, IR2Norm, IR3Norm, IR4Norm, IR5Norm};
   if (isIntersection(latestNormedValues))
@@ -171,35 +179,51 @@ void loop()
     onIntersection = false;
   }
 
-  // Serial.println(IR3Norm)
-
-  if ((currentMillis - previousMillis >= DELTA_TIME))
+  if (!fullStop)
   {
-    PIDLineTracker(weightedLocation, DELTA_TIME);
-
-    if (!fullStop)
-    {
-      motors.setM1Speed(rightSpeed);
-      motors.setM2Speed(leftSpeed);
-    }
-    else
-    {
-      motors.setM1Speed(0);
-      motors.setM2Speed(0);
-    }
-
-    previousMillis = currentMillis;
+    motors.setM1Speed(rightSpeed);
+    motors.setM2Speed(leftSpeed);
+  }
+  else
+  {
+    motors.setM1Speed(0);
+    motors.setM2Speed(0);
   }
 }
 
-void PIDLineTracker(float actualValue, float delta_time)
+void PIDLineTracker()
 {
+
+  // read the line tracking sensor channels
+  IR1Val = analogRead(IR1_PIN);
+  IR2Val = analogRead(IR2_PIN);
+  IR3Val = analogRead(IR3_PIN);
+  IR4Val = analogRead(IR4_PIN);
+  IR5Val = analogRead(IR5_PIN);
+
+  // compute the normalized channel values
+  IR1Norm = computeNormVal(IR1Val, IR1Min, IR1Max);
+  IR2Norm = computeNormVal(IR2Val, IR2Min, IR2Max);
+  IR3Norm = computeNormVal(IR3Val, IR3Min, IR3Max);
+  IR4Norm = computeNormVal(IR4Val, IR4Min, IR4Max);
+  IR5Norm = computeNormVal(IR5Val, IR5Min, IR5Max);
+
+  // determine which channel lies over the line
+  // note: to prevent NAN, you can change to (1 - IR1Norm) to (1.001 - IR1Norm), etc.
+  numerator = ((1 - IR1Norm) * 1 + (1 - IR2Norm) * 2 + (1 - IR3Norm) * 3 + (1 - IR4Norm) * 4 + (1 - IR5Norm) * 5);
+  denominator = (1 - IR1Norm) + (1 - IR2Norm) + (1 - IR3Norm) + (1 - IR4Norm) + (1 - IR5Norm);
+  float actualValue = numerator / denominator;
+
+  if (isnan(actualValue))
+  {
+    actualValue = 3.0;
+  }
 
   // compute the error
   error = SETPOINT - actualValue;
 
   // convert time from milliseconds to seconds
-  delta_time = delta_time * MILLISEC_TO_SEC;
+  float delta_time = 0.001;
 
   // PID computation for left wheel
   leftIntegral = leftIntegral + error * delta_time;
