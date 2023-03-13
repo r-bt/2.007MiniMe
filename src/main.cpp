@@ -3,25 +3,9 @@
 #include "DFRobotMotorShield.h"
 DFRobotMotorShield motors;
 
-#define TIMER_INTERRUPT_DEBUG 0
-
-#define USE_TIMER_1 false
-#define USE_TIMER_2 true
-#define USE_TIMER_3 false
-#define USE_TIMER_4 false
-#define USE_TIMER_5 false
-
-#include "TimerInterrupt.h" //https://github.com/khoih-prog/TimerInterrupt
-#include "ISR_Timer.h"      //https://github.com/khoih-prog/TimerInterrupt
-
-ISR_Timer ISR_Timer2;
-
-#define TIMER2_INTERVAL_MS 1L
-
-volatile uint32_t startMillis = 0;
-
-volatile uint32_t deltaMillis2s = 0;
-volatile uint32_t deltaMillis5s = 0;
+// SETUP PID Timer
+#include "PIDTimer.h"
+PIDTimer pid_timer;
 
 /*
 2.S007 Mini Me Physical Homework Three
@@ -94,11 +78,6 @@ float computeNormVal(float sensorVal, float minVal, float maxVal);
 bool isIntersection(float latestNormedValues[5]);
 void PIDLineTracker();
 
-void TimerHandler2()
-{
-  ISR_Timer2.run();
-}
-
 void setup()
 {
   Serial.begin(115200);
@@ -136,14 +115,9 @@ void setup()
     }
   }
 
-  // Timer stuff
-  ITimer2.init();
-  if (ITimer2.attachInterruptInterval(TIMER2_INTERVAL_MS, TimerHandler2))
-    Serial.println("Starting  ITimer2 OK, millis() = " + String(millis()));
-  else
-    Serial.println("Can't set ITimer2. Select another freq., duration or timer");
-
-  ISR_Timer2.setInterval(1L, PIDLineTracker);
+  // ISR_Timer2.setInterval(1L, PIDLineTracker);
+  pid_timer.init();
+  pid_timer.attachPID(1L, PIDLineTracker);
 }
 
 void loop()
@@ -162,7 +136,7 @@ void loop()
       {
         fullStop = true;
       }
-      digitalWrite(8, HIGH);
+      // digitalWrite(8, HIGH);
     }
 
     numerator = ((1 - IR2Norm) * 2 + (1 - IR3Norm) * 3 + (1 - IR4Norm) * 4);
@@ -174,7 +148,7 @@ void loop()
     if (onIntersection)
     {
       Serial.println("Off intersection!");
-      digitalWrite(8, LOW);
+      // digitalWrite(8, LOW);
     }
     onIntersection = false;
   }
@@ -193,7 +167,7 @@ void loop()
 
 void PIDLineTracker()
 {
-
+  digitalWrite(8, HIGH);
   // read the line tracking sensor channels
   IR1Val = analogRead(IR1_PIN);
   IR2Val = analogRead(IR2_PIN);
