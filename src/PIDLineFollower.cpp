@@ -17,7 +17,6 @@ void PIDLineFollower::init()
     pinMode(IR5_PIN, INPUT);
 
     // Setup Intersection Array
-    // Setup our intersection array
     for (int i = 0; i < 5; i++)
     {
         for (int j = 0; j < NORMED_VALUES_BUFFER_SIZE; j++)
