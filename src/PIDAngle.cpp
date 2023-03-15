@@ -18,24 +18,26 @@ void PIDAngle::init()
         while (1)
             ;
     }
+
+    // Setup Intersection Array
+    for (int i = 0; i < ANGLE_ERRORS_COUNT; i++)
+    {
+        errors[i] = 180;
+    }
 }
 
 void PIDAngle::runPIDAngle()
 {
 
-    // Allow wire communication inside call
-    sei();
-
-    uint8_t system, gyro, accel, mag;
-    gyro = 0;
-
-    bno.getCalibration(&system, &gyro, &accel, &mag);
-
-    /* The data should be ignored until the system calibration is > 0 */
-    if (gyro == 0)
+    if (!is_enabled)
     {
         return;
     }
+
+    // Allow wire communication inside call
+    sei();
+
+    digitalWrite(8, HIGH);
 
     /* Get a new sensor event */
     sensors_event_t event;
@@ -88,4 +90,46 @@ void PIDAngle::runPIDAngle()
         *rightSpeed = -MAX_MOTOR_SPEED;
     }
     previousError = error;
+
+    // Track the error
+    if (error_index == ANGLE_ERRORS_COUNT)
+    {
+        error_index = 0;
+    }
+    errors[error_index] = error;
+    error_index += 1;
+}
+
+void PIDAngle::enable()
+{
+    is_enabled = true;
+}
+
+void PIDAngle::disable()
+{
+    is_enabled = false;
+    previousError = 0.0;
+    leftIntegral = 0.0;
+    rightIntegral = 0.0;
+}
+
+void PIDAngle::set_angle(float angle)
+{
+    ANGLE = angle;
+    // Setup Intersection Array
+    for (int i = 0; i < ANGLE_ERRORS_COUNT; i++)
+    {
+        errors[i] = 180;
+    }
+}
+
+bool PIDAngle::get_confidence()
+{
+    float sum = 0;
+    for (int k = 0; k < ANGLE_ERRORS_COUNT; k++)
+    {
+        sum += errors[k];
+    }
+
+    return (sum / ANGLE_ERRORS_COUNT) < angle_error_confidence_threshold;
 }

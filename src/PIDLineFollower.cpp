@@ -28,6 +28,11 @@ void PIDLineFollower::init()
 
 void PIDLineFollower::PIDLineFollowing()
 {
+    if (!is_enabled)
+    {
+        return;
+    }
+
     // read the line tracking sensor channels
     int IR1Val = analogRead(IR1_PIN);
     int IR2Val = analogRead(IR2_PIN);
@@ -126,4 +131,17 @@ bool PIDLineFollower::isIntersection(float latestNormedValues[5])
 
     currentIndex += 1;
     return true;
+}
+
+void PIDLineFollower::enable()
+{
+    is_enabled = true;
+}
+
+void PIDLineFollower::disable()
+{
+    is_enabled = false;
+    previousError = 0.0;
+    leftIntegral = 0.0;
+    rightIntegral = 0.0;
 }

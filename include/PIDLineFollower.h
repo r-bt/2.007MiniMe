@@ -49,6 +49,8 @@ private:
 
     bool isIntersection(float latestNormedValues[5]);
 
+    bool is_enabled = false;
+
 public:
     int NORMAL_SPEED;
     int MAX_MOTOR_SPEED;
@@ -66,6 +68,9 @@ public:
 
     void init();
     void PIDLineFollowing();
+
+    void enable();
+    void disable();
 };
 
 float computeNormVal(float sensorVal, float minVal, float maxVal);
