@@ -22,12 +22,6 @@
 #define IR5Max 984
 
 // Define our PID Values
-#define KP_Left 200.0
-#define KI_Left 10.0
-#define KD_Left 11.0
-#define KP_Right 200.0
-#define KI_Right 10.0
-#define KD_Right 11.0
 
 // Intersection code
 #define NORMED_VALUES_BUFFER_SIZE 10
@@ -44,6 +38,14 @@ private:
     float normedValues[5][NORMED_VALUES_BUFFER_SIZE];
     int currentIndex = 0;
     float intersectionThreshold = 0.95;
+
+    // Define our PID values
+    float KP_Left = 200.0;
+    float KI_Left = 10.0;
+    float KD_Left = 11.0;
+    float KP_Right = 200.0;
+    float KI_Right = 10.0;
+    float KD_Right = 11.0;
 
     bool isIntersection(float latestNormedValues[5]);
 
