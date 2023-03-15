@@ -1,7 +1,7 @@
 /*
-Richard Beattie
-
-Timer Utility to run PID controller at 1ms (maximum is about 12ms with delay())
+Author: Richard Beattie
+Description: Timer Utility to run PID controller at 1ms (maximum is about 12ms with delay())
+Date: 13/03/2023
 */
 
 #include "Timers.h"
