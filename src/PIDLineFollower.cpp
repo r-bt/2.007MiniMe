@@ -123,7 +123,6 @@ bool PIDLineFollower::isIntersection(float latestNormedValues[5])
         float average = sum / NORMED_VALUES_BUFFER_SIZE;
         if (average > intersectionThreshold)
         {
-            Serial.println(average);
             currentIndex += 1;
             return false;
         }

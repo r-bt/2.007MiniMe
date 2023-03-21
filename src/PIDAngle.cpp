@@ -37,8 +37,6 @@ void PIDAngle::runPIDAngle()
     // Allow wire communication inside call
     sei();
 
-    digitalWrite(8, HIGH);
-
     /* Get a new sensor event */
     sensors_event_t event;
     bno.getEvent(&event);
@@ -96,13 +94,23 @@ void PIDAngle::runPIDAngle()
     {
         error_index = 0;
     }
-    errors[error_index] = error;
+    errors[error_index] = abs(error);
     error_index += 1;
 }
 
-void PIDAngle::enable()
+void PIDAngle::enable(float angle)
 {
+    if (is_enabled)
+        return;
+
     is_enabled = true;
+
+    ANGLE = angle;
+    // Setup Intersection Array
+    for (int i = 0; i < ANGLE_ERRORS_COUNT; i++)
+    {
+        errors[i] = 180;
+    }
 }
 
 void PIDAngle::disable()
@@ -113,16 +121,6 @@ void PIDAngle::disable()
     rightIntegral = 0.0;
 }
 
-void PIDAngle::set_angle(float angle)
-{
-    ANGLE = angle;
-    // Setup Intersection Array
-    for (int i = 0; i < ANGLE_ERRORS_COUNT; i++)
-    {
-        errors[i] = 180;
-    }
-}
-
 bool PIDAngle::get_confidence()
 {
     float sum = 0;
@@ -130,6 +128,8 @@ bool PIDAngle::get_confidence()
     {
         sum += errors[k];
     }
+
+    Serial.println((sum / ANGLE_ERRORS_COUNT));
 
     return (sum / ANGLE_ERRORS_COUNT) < angle_error_confidence_threshold;
 }

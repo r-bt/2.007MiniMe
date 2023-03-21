@@ -24,7 +24,7 @@
 // Define our PID Values
 
 // Intersection code
-#define NORMED_VALUES_BUFFER_SIZE 10
+#define NORMED_VALUES_BUFFER_SIZE 20
 
 class PIDLineFollower
 {

@@ -3,7 +3,7 @@
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
 
-#define ANGLE_ERRORS_COUNT 5
+#define ANGLE_ERRORS_COUNT 40
 
 class PIDAngle
 {
@@ -13,15 +13,15 @@ private:
     volatile float previousError = 0.0;
     volatile float leftIntegral = 0.0;
     volatile float rightIntegral = 0.0;
-    const float KP_left = 7.0;
+    const float KP_left = 3.5;
     const float KI_left = 0.05;
-    const float KD_left = 0;
-    const float KP_right = 7.0;
+    const float KD_left = 0.03;
+    const float KP_right = 3.5;
     const float KI_right = 0.05;
-    const float KD_right = 0;
+    const float KD_right = 0.03;
     bool is_enabled = false;
 
-    const float angle_error_confidence_threshold = 5;
+    const float angle_error_confidence_threshold = 10.0;
 
     float errors[ANGLE_ERRORS_COUNT];
     int error_index = 0;
@@ -47,10 +47,8 @@ public:
 
     void init();
 
-    void enable();
+    void enable(float angle);
     void disable();
 
     bool get_confidence();
-
-    void set_angle(float angle);
 };
