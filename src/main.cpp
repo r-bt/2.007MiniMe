@@ -22,7 +22,7 @@ DFRobotMotorShield motors;
 // wheel speeds
 volatile int leftSpeed, rightSpeed;
 
-const int NORMAL_SPEED = 255;
+const int NORMAL_SPEED = 230;
 const int NORMAL_SPEED_ANGLE = 0;
 const int maxMotorSpeed = 255;
 
@@ -117,15 +117,11 @@ bool count_intersections()
     }
     else
     {
-      digitalWrite(8, LOW);
+      // digitalWrite(8, LOW);
     }
   }
   else
   {
-    if (onIntersection)
-    {
-      // digitalWrite(8, LOW);
-    }
     onIntersection = false;
   }
   return false;
@@ -255,36 +251,4 @@ void loop()
 
   motors.setM1Speed(rightSpeed);
   motors.setM2Speed(leftSpeed);
-  // if (pid_line_follower.onIntersection)
-  // {
-  //   if (!onIntersection)
-  //   {
-  //     onIntersection = true;
-  //     crossedIntersections += 1;
-  //     if (crossedIntersections == 13)
-  //     {
-  //       fullStop = true;
-  //     }
-  //     digitalWrite(8, HIGH);
-  //   }
-  // }
-  // else
-  // {
-  //   if (onIntersection)
-  //   {
-  //     Serial.println("Off intersection!");
-  //     digitalWrite(8, LOW);
-  //   }
-  //   onIntersection = false;
-  // }
-
-  // if (!fullStop)
-  // {
-  //
-  // }
-  // else
-  // {
-  //   motors.setM1Speed(0);
-  //   motors.setM2Speed(0);
-  // }
 }
