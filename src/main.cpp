@@ -46,21 +46,35 @@ void runPIDAngle();
 void set_desired_intersections(int intersections);
 bool count_intersections();
 
-enum STATE
+enum STATE_TYPE
 {
-  STRAIGHT_1,
-  TURN_90,
-  STRAIGHT_2,
-  TURN_90_2,
-  STRAIGHT_3,
-  TURN_90_3,
-  STRAIGHT_4,
-  TURN_90_4,
-  STRAIGHT_5,
+  STRAIGHT,
+  ANGLE,
   NONE
 };
 
-STATE current_state = STRAIGHT_1;
+struct State
+{
+  STATE_TYPE type;
+  int value;
+};
+
+struct State states[] = {
+    {STRAIGHT, 13},
+    {ANGLE, 90},
+    {STRAIGHT, 13},
+    {ANGLE, 180},
+    {STRAIGHT, 10},
+    {ANGLE, 270},
+    {STRAIGHT, 13},
+    {ANGLE, 180},
+    {STRAIGHT, 1},
+    {NONE, 0}};
+
+int current_state_index = 0;
+
+void handle_angle_state(State current_state);
+void handle_straight_state(State current_state);
 
 void setup()
 {
@@ -129,126 +143,51 @@ bool count_intersections()
 
 void loop()
 {
-  if (current_state == STRAIGHT_1)
-  {
-    if (desiredIntersections == 0)
-    {
-      set_desired_intersections(13);
-      pid_line_follower.enable();
-    }
-    if (count_intersections())
-    {
-      current_state = TURN_90;
-      pid_line_follower.disable();
-      full_stop();
-    }
-  }
-  else if (current_state == TURN_90)
-  {
-    pid_angle.enable(90);
+  struct State current_state = states[current_state_index];
 
-    if (pid_angle.get_confidence())
-    {
-      pid_angle.disable();
-      full_stop();
-      digitalWrite(8, HIGH);
-      current_state = STRAIGHT_2;
-    }
-  }
-  else if (current_state == STRAIGHT_2)
+  switch (current_state.type)
   {
-    if (desiredIntersections == 0)
-    {
-      set_desired_intersections(13);
-      onIntersection = true;
-      pid_line_follower.enable();
-    }
-    if (count_intersections())
-    {
-      current_state = TURN_90_2;
-      pid_line_follower.disable();
-      full_stop();
-    }
-  }
-  else if (current_state == TURN_90_2)
-  {
-    pid_angle.enable(180);
-
-    if (pid_angle.get_confidence())
-    {
-      pid_angle.disable();
-      full_stop();
-      current_state = STRAIGHT_3;
-    }
-  }
-  else if (current_state == STRAIGHT_3)
-  {
-    if (desiredIntersections == 0)
-    {
-      set_desired_intersections(10);
-      onIntersection = true;
-      pid_line_follower.enable();
-    }
-    if (count_intersections())
-    {
-      current_state = TURN_90_3;
-      pid_line_follower.disable();
-      full_stop();
-    }
-  }
-  else if (current_state == TURN_90_3)
-  {
-    pid_angle.enable(270);
-
-    if (pid_angle.get_confidence())
-    {
-      pid_angle.disable();
-      full_stop();
-      current_state = STRAIGHT_4;
-    }
-  }
-  else if (current_state == STRAIGHT_4)
-  {
-    if (desiredIntersections == 0)
-    {
-      set_desired_intersections(13);
-      onIntersection = true;
-      pid_line_follower.enable();
-    }
-    if (count_intersections())
-    {
-      current_state = TURN_90_4;
-      pid_line_follower.disable();
-      full_stop();
-    }
-  }
-  else if (current_state == TURN_90_4)
-  {
-    pid_angle.enable(180);
-
-    if (pid_angle.get_confidence())
-    {
-      pid_angle.disable();
-      full_stop();
-      current_state = STRAIGHT_5;
-    }
-  }
-  else if (current_state == STRAIGHT_5)
-  {
-    if (desiredIntersections == 0)
-    {
-      set_desired_intersections(1);
-      onIntersection = true;
-      pid_line_follower.enable();
-    }
-    if (count_intersections())
-    {
-      current_state = NONE;
-      pid_line_follower.disable();
-      full_stop();
-    }
-  }
+  case NONE:
+    return;
+  case STRAIGHT:
+    handle_straight_state(current_state);
+    break;
+  case ANGLE:
+    handle_angle_state(current_state);
+    break;
+  };
 
   motors.setM1Speed(rightSpeed);
   motors.setM2Speed(leftSpeed);
+}
+
+void handle_straight_state(State current_state)
+{
+
+  if (desiredIntersections == 0)
+  {
+    set_desired_intersections(current_state.value);
+    pid_line_follower.enable();
+  }
+
+  if (count_intersections())
+  {
+    current_state_index += 1;
+    full_stop();
+    pid_line_follower.disable();
+    return;
+  }
+}
+
+void handle_angle_state(State current_state)
+{
+  pid_angle.enable(current_state.value);
+
+  if (pid_angle.get_confidence())
+  {
+    full_stop();
+    current_state_index += 1;
+    pid_angle.disable();
+    return;
+  }
 }
