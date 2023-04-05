@@ -1,5 +1,7 @@
 #include "Encoders.h"
 
+Encoders *Encoders::instance0_;
+
 void Encoders::init()
 {
     // Attach to instance
@@ -83,7 +85,7 @@ void Encoders::reset_counts()
     rightEncoderCount = 0;
 }
 
-void Encoders::get_distance()
+float Encoders::get_distance()
 {
     float leftDistance = (leftEncoderCount / ENC_COUNT_REV) * PI * WHEEL_DIAMETER;
     float rightDistance = (rightEncoderCount / ENC_COUNT_REV) * PI * WHEEL_DIAMETER;

@@ -129,7 +129,10 @@ bool PIDAngle::get_confidence()
         sum += errors[k];
     }
 
-    Serial.println((sum / ANGLE_ERRORS_COUNT));
-
     return (sum / ANGLE_ERRORS_COUNT) < angle_error_confidence_threshold;
+}
+
+void PIDAngle::set_normal_speed(float speed)
+{
+    NORMAL_SPEED = speed;
 }

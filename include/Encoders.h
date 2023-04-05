@@ -1,6 +1,6 @@
 #include <Arduino.h>
 
-#define ENC_COUNT_REV 1920
+#define ENC_COUNT_REV 1920.0
 #define WHEEL_DIAMETER 6.45 // cm
 
 class Encoders
@@ -33,6 +33,6 @@ public:
 
     void init();
 
-    void get_distance();
+    float get_distance();
     void reset_counts();
 };

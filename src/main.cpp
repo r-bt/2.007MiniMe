@@ -19,6 +19,9 @@ DFRobotMotorShield motors;
 // SETUP PID Angle Following
 #include "PIDAngle.h"
 
+// Encoders
+#include "Encoders.h"
+
 // wheel speeds
 volatile int leftSpeed, rightSpeed;
 
@@ -31,6 +34,7 @@ const int intersectionMillisThreshold = 50;
 
 PIDLineFollower pid_line_follower(NORMAL_SPEED, maxMotorSpeed, &leftSpeed, &rightSpeed);
 PIDAngle pid_angle(NORMAL_SPEED_ANGLE, maxMotorSpeed, &leftSpeed, &rightSpeed);
+Encoders encoders;
 
 PIDTimer pid_timer;
 
@@ -48,8 +52,9 @@ bool count_intersections();
 
 enum STATE_TYPE
 {
-  STRAIGHT,
+  LINE_FOLLOW,
   ANGLE,
+  DISTANCE,
   NONE
 };
 
@@ -57,24 +62,26 @@ struct State
 {
   STATE_TYPE type;
   int value;
+  int extra_value;
 };
 
 struct State states[] = {
-    {STRAIGHT, 13},
-    {ANGLE, 90},
-    {STRAIGHT, 13},
-    {ANGLE, 180},
-    {STRAIGHT, 10},
-    {ANGLE, 270},
-    {STRAIGHT, 13},
-    {ANGLE, 180},
-    {STRAIGHT, 1},
-    {NONE, 0}};
+    {DISTANCE, 183, 0}};
+// {ANGLE, 90},
+// {LINE_FOLLOW, 13},
+// {ANGLE, 180},
+// {LINE_FOLLOW, 10},
+// {ANGLE, 270},
+// {LINE_FOLLOW, 13},
+// {ANGLE, 180},
+// {LINE_FOLLOW, 1},
+// {NONE, 0}};
 
 int current_state_index = 0;
 
 void handle_angle_state(State current_state);
-void handle_straight_state(State current_state);
+void handle_LINE_FOLLOW_state(State current_state);
+void handle_distance_state(State current_state);
 
 void setup()
 {
@@ -82,6 +89,7 @@ void setup()
 
   pid_line_follower.init();
   pid_angle.init();
+  encoders.init();
 
   pinMode(8, OUTPUT);
 
@@ -149,11 +157,14 @@ void loop()
   {
   case NONE:
     return;
-  case STRAIGHT:
-    handle_straight_state(current_state);
+  case LINE_FOLLOW:
+    handle_LINE_FOLLOW_state(current_state);
     break;
   case ANGLE:
     handle_angle_state(current_state);
+    break;
+  case DISTANCE:
+    handle_distance_state(current_state);
     break;
   };
 
@@ -161,7 +172,7 @@ void loop()
   motors.setM2Speed(leftSpeed);
 }
 
-void handle_straight_state(State current_state)
+void handle_LINE_FOLLOW_state(State current_state)
 {
 
   if (desiredIntersections == 0)
@@ -189,5 +200,30 @@ void handle_angle_state(State current_state)
     current_state_index += 1;
     pid_angle.disable();
     return;
+  }
+}
+
+bool init_distance = true;
+
+void handle_distance_state(State current_state)
+{
+  if (init_distance)
+  {
+    pid_angle.enable(current_state.extra_value);
+    encoders.reset_counts();
+    init_distance = false;
+  }
+
+  if (pid_angle.get_confidence())
+  {
+    pid_angle.set_normal_speed(NORMAL_SPEED);
+
+    if (encoders.get_distance() > current_state.value)
+    {
+      full_stop();
+      current_state_index += 1;
+      pid_angle.disable();
+      init_distance = true;
+    }
   }
 }

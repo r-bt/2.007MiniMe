@@ -50,5 +50,7 @@ public:
     void enable(float angle);
     void disable();
 
+    void set_normal_speed(float speed);
+
     bool get_confidence();
 };
