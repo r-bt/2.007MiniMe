@@ -33,7 +33,7 @@ int previousIntersectionMillis = 0;
 const int intersectionMillisThreshold = 50;
 
 PIDLineFollower pid_line_follower(NORMAL_SPEED, maxMotorSpeed, &leftSpeed, &rightSpeed);
-PIDAngle pid_angle(NORMAL_SPEED_ANGLE, maxMotorSpeed, &leftSpeed, &rightSpeed);
+PIDAngle pid_angle(&leftSpeed, &rightSpeed);
 Encoders encoders;
 
 PIDTimer pid_timer;
@@ -46,7 +46,6 @@ bool fullStop = false;
 
 void PIDLineTracker();
 void runPIDLineFollowingTimer();
-void runPIDAngle();
 void set_desired_intersections(int intersections);
 bool count_intersections();
 
@@ -66,16 +65,18 @@ struct State
 };
 
 struct State states[] = {
-    {DISTANCE, 183, 0}};
-// {ANGLE, 90},
-// {LINE_FOLLOW, 13},
-// {ANGLE, 180},
-// {LINE_FOLLOW, 10},
-// {ANGLE, 270},
-// {LINE_FOLLOW, 13},
-// {ANGLE, 180},
-// {LINE_FOLLOW, 1},
-// {NONE, 0}};
+    // {DISTANCE, 183, -45},
+    // {DISTANCE, 183, -135}};
+    {LINE_FOLLOW, 13},
+    {ANGLE, -90},
+    {LINE_FOLLOW, 13},
+    {ANGLE, -180},
+    {LINE_FOLLOW, 10},
+    {ANGLE, -270},
+    {LINE_FOLLOW, 13},
+    {ANGLE, -180},
+    {LINE_FOLLOW, 1},
+    {NONE, 0}};
 
 int current_state_index = 0;
 
@@ -87,20 +88,14 @@ void setup()
 {
   Serial.begin(115200);
 
-  pid_line_follower.init();
+  // pid_line_follower.init();
   pid_angle.init();
   encoders.init();
 
   pinMode(8, OUTPUT);
 
   pid_timer.init();
-  pid_timer.attachPID(1L, runPIDLineFollowingTimer);
-  pid_timer.attachPID(10L, runPIDAngle);
-}
-
-void runPIDAngle()
-{
-  pid_angle.runPIDAngle();
+  pid_timer.attachPID(10L, runPIDLineFollowingTimer);
 }
 
 void runPIDLineFollowingTimer()
@@ -192,7 +187,8 @@ void handle_LINE_FOLLOW_state(State current_state)
 
 void handle_angle_state(State current_state)
 {
-  pid_angle.enable(current_state.value);
+  pid_angle.enable();
+  pid_angle.set_setpoint(current_state.value);
 
   if (pid_angle.get_confidence())
   {
@@ -201,6 +197,8 @@ void handle_angle_state(State current_state)
     pid_angle.disable();
     return;
   }
+
+  pid_angle.compute();
 }
 
 bool init_distance = true;
@@ -209,14 +207,17 @@ void handle_distance_state(State current_state)
 {
   if (init_distance)
   {
-    pid_angle.enable(current_state.extra_value);
+    pid_angle.enable();
+    pid_angle.set_setpoint(current_state.extra_value);
     encoders.reset_counts();
     init_distance = false;
   }
 
   if (pid_angle.get_confidence())
   {
-    pid_angle.set_normal_speed(NORMAL_SPEED);
+    int straight_speed = encoders.get_distance() > (current_state.value * 0.9) ? NORMAL_SPEED * 0.7 : NORMAL_SPEED;
+
+    pid_angle.set_normal_speed(straight_speed);
 
     if (encoders.get_distance() > current_state.value)
     {
@@ -224,6 +225,9 @@ void handle_distance_state(State current_state)
       current_state_index += 1;
       pid_angle.disable();
       init_distance = true;
+      return;
     }
   }
+
+  pid_angle.compute();
 }

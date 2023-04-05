@@ -1,16 +1,7 @@
 #include "PIDAngle.h"
 
-double PIDAngle::constrainAngle(double x)
-{
-    x = fmod(x + 180, 360);
-    if (x < 0)
-        x += 360;
-    return x - 180;
-}
-
 void PIDAngle::init()
 {
-    /* Initialise the sensor */
     if (!bno.begin())
     {
         /* There was a problem detecting the BNO055 ... check your connections */
@@ -19,120 +10,88 @@ void PIDAngle::init()
             ;
     }
 
-    // Setup Intersection Array
-    for (int i = 0; i < ANGLE_ERRORS_COUNT; i++)
-    {
-        errors[i] = 180;
-    }
-}
-
-void PIDAngle::runPIDAngle()
-{
-
-    if (!is_enabled)
-    {
-        return;
-    }
-
-    // Allow wire communication inside call
-    sei();
-
+    bno.setExtCrystalUse(true);
     /* Get a new sensor event */
     sensors_event_t event;
     bno.getEvent(&event);
 
-    // // get the yaw angle
-    float yawAngle = event.orientation.x;
+    yawAngle = event.orientation.x; // deg
+    remappedYawAngle = remapAngle(yawAngle);
 
-    // Serial.print("ANGLE: ");
-    // Serial.print(yawAngle);
-    // Serial.print(",error=");
+    // SETUP PID
+    rightPID.SetSampleTime(25); // Set PID sampling frequency is 100ms
+    rightPID.SetOutputLimits(-255, 255);
 
-    // compute the error
-    float error = constrainAngle(int(ANGLE) - int(yawAngle));
+    leftPID.SetSampleTime(25); // Set PID sampling frequency is 100ms
+    leftPID.SetOutputLimits(-255, 255);
 
-    // Serial.println(error);
-
-    // convert time from milliseconds to seconds
-    float delta_time = 0.01;
-
-    // PID computation for left wheel
-    leftIntegral = leftIntegral + error * delta_time;
-    float angle_leftDerivative = (error - previousError) / delta_time;
-    float leftDeltaSpeed = int(KP_left * error + KI_left * leftIntegral + KD_left * angle_leftDerivative);
-    *leftSpeed = NORMAL_SPEED + leftDeltaSpeed;
-
-    // contrain the wheel speed to lie between -maxMotorSpeed and maxMotorSpeed
-    if (*leftSpeed > MAX_MOTOR_SPEED)
+    if (!calibrated)
     {
-        *leftSpeed = MAX_MOTOR_SPEED;
-    }
-    else if (*leftSpeed < -MAX_MOTOR_SPEED)
-    {
-        *leftSpeed = -MAX_MOTOR_SPEED;
-    }
-
-    // PID computation for right wheel
-    rightIntegral = rightIntegral + error * delta_time;
-    float rightDerivative = (error - previousError) / delta_time;
-    float rightDeltaSpeed = int(KP_right * error + KI_right * rightIntegral + KD_right * rightDerivative);
-    *rightSpeed = NORMAL_SPEED - rightDeltaSpeed;
-
-    // contrain the wheel speed to lie between -maxMotorSpeed and maxMotorSpeed
-    if (*rightSpeed > MAX_MOTOR_SPEED)
-    {
-        *rightSpeed = MAX_MOTOR_SPEED;
-    }
-    else if (*rightSpeed < -MAX_MOTOR_SPEED)
-    {
-        *rightSpeed = -MAX_MOTOR_SPEED;
-    }
-    previousError = error;
-
-    // Track the error
-    if (error_index == ANGLE_ERRORS_COUNT)
-    {
-        error_index = 0;
-    }
-    errors[error_index] = abs(error);
-    error_index += 1;
-}
-
-void PIDAngle::enable(float angle)
-{
-    if (is_enabled)
+        get_is_calibrated();
         return;
-
-    is_enabled = true;
-
-    ANGLE = angle;
-    // Setup Intersection Array
-    for (int i = 0; i < ANGLE_ERRORS_COUNT; i++)
-    {
-        errors[i] = 180;
     }
 }
 
-void PIDAngle::disable()
+double PIDAngle::remapAngle(double angle)
 {
-    is_enabled = false;
-    previousError = 0.0;
-    leftIntegral = 0.0;
-    rightIntegral = 0.0;
+    double xyCoordinate[2];
+
+    angle = angle * DEG_TO_RAD;
+    xyCoordinate[0] = cos(angle);
+    xyCoordinate[1] = -sin(angle);
+
+    return RAD_TO_DEG * (atan2(xyCoordinate[1], xyCoordinate[0]));
+}
+
+void PIDAngle::compute()
+{
+    if (!calibrated)
+    {
+        get_is_calibrated();
+        return;
+    }
+
+    sensors_event_t event;
+    bno.getEvent(&event);
+
+    // get the yaw angle
+    yawAngle = event.orientation.x; // deg
+    remappedYawAngle = remapAngle(yawAngle);
+
+    rightPID.Compute();
+    leftPID.Compute();
+
+    *leftSpeed = NORMAL_SPEED - leftDeltaSpeed;
+    *rightSpeed = NORMAL_SPEED + rightDeltaSpeed;
+}
+
+void PIDAngle::set_setpoint(double angle)
+{
+    SETPOINT = angle;
+    setpointLowerLimit = SETPOINT - angleTolerance;
+    setpointUpperLimit = SETPOINT + angleTolerance;
 }
 
 bool PIDAngle::get_confidence()
 {
-    float sum = 0;
-    for (int k = 0; k < ANGLE_ERRORS_COUNT; k++)
-    {
-        sum += errors[k];
-    }
-
-    return (sum / ANGLE_ERRORS_COUNT) < angle_error_confidence_threshold;
+    return ((remappedYawAngle >= setpointLowerLimit) && (remappedYawAngle <= setpointUpperLimit));
 }
 
-void PIDAngle::set_normal_speed(float speed)
+void PIDAngle::reset_normal_speed()
+{
+    NORMAL_SPEED = 0;
+}
+
+void PIDAngle::set_normal_speed(double speed)
 {
     NORMAL_SPEED = speed;
+}
+
+void PIDAngle::get_is_calibrated()
+{
+    uint8_t system, gyro, accel, mag;
+    system = gyro = accel = mag = 0;
+    bno.getCalibration(&system, &gyro, &accel, &mag);
+
+    calibrated = gyro == 3;
 }
